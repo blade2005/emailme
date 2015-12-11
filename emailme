@@ -1,0 +1,83 @@
+#!/usr/bin/python
+import os
+import sys
+import smtplib
+import ConfigParser
+import argparse
+
+try:
+    from email.mime.text import MIMEText
+except ImportError:
+    # Python 2.4 (CentOS 5.x)
+    from email.MIMEText import MIMEText
+CONFIGFILE = os.environ['HOME'] + '/.emailme.conf'
+
+def main():
+    '''Main'''
+    config = ConfigParser.ConfigParser()
+    if os.path.exists(CONFIGFILE):
+        config.read(CONFIGFILE)
+    else:
+        print "Missing %s. Exiting." % (CONFIGFILE)
+        sys.exit(1)
+
+    config = dict(config.items('emailme'))
+    parser = argparse.ArgumentParser(
+        description=(
+            'Notify by Email'
+        )
+    )
+    parser.add_argument(
+        '--to',
+        action='store',
+        required=True,
+        type=str,
+        help='<status str>'
+    )
+    parser.add_argument(
+        '--subject',
+        action='store',
+        required=True,
+        type=str,
+        help='<state UUID>'
+    )
+    parser.add_argument(
+        '--message',
+        action='store',
+        required=True,
+        type=str,
+        help='<yes/no>'
+    )
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(1)
+    args_obj = parser.parse_args()
+    args = vars(args_obj)
+    config.update(args)
+    send_notification(config)
+
+def send_notification(config):
+    '''Send notification by eamil'''
+    message = config['message'].split('\\n')
+    message = "\n".join(message)
+    msg = MIMEText(message)
+
+    msg['From'] = config['from']
+    msg['To'] = config['to']
+    msg['Subject'] = config['subject']
+
+    if(config['ssl']):
+        mailer = smtplib.SMTP_SSL(config['host'], config['port'])
+    else:
+        mailer = smtplib.SMTP(config['port'], config['port'])
+
+    if(config['auth']):
+        mailer.login(config['username'], config['password'])
+
+    mailer.sendmail(config['from'], config['to'], msg.as_string())
+    mailer.close()
+    print "Sent email to %(to)s" % config
+
+
+if __name__ == "__main__":
+    main()
